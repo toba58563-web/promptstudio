@@ -1,0 +1,1315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <title>Prompt Studio | Premium AI Prompts</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+            padding-bottom: 90px;
+        }
+        
+        /* FIX 1: REMOVED backdrop-filter from glass (main cause of lag) */
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            /* backdrop-filter: blur(10px); - REMOVED - was causing severe lag */
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        /* FIX 2: Simplified glass-card - removed heavy backdrop-filter */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.08);
+            /* backdrop-filter: blur(12px); - REMOVED - performance killer */
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            transition: transform 0.2s ease; /* Reduced transition time */
+            overflow: hidden;
+        }
+        
+        .glass-card:hover {
+            transform: translateY(-4px);
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(139, 92, 246, 0.5);
+            box-shadow: 0 12px 25px rgba(0, 0, 0, 0.2);
+        }
+        
+        /* FIX 3: DISABLED scroll reveal animations (caused micro-stutters) */
+        /* REMOVED .reveal-card animations entirely - no more paint during scroll */
+        
+        /* Simple static styles only - no animations during scroll */
+        .skeleton {
+            background: linear-gradient(110deg, 
+                rgba(255, 255, 255, 0.05) 0%, 
+                rgba(255, 255, 255, 0.08) 25%, 
+                rgba(255, 255, 255, 0.15) 50%, 
+                rgba(255, 255, 255, 0.08) 75%, 
+                rgba(255, 255, 255, 0.05) 100%);
+            background-size: 200% 100%;
+            animation: skeletonShimmer 1.8s ease-in-out infinite;
+            border-radius: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        @keyframes skeletonShimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        /* FIX 4: Removed heavy shimmer from images during load */
+        .image-container {
+            aspect-ratio: 2 / 3;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Simplified loading state - no heavy gradient animation */
+        .image-container.loading {
+            background: rgba(139, 92, 246, 0.2);
+        }
+        
+        .image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.2s ease;
+        }
+        
+        .glass-card:hover .image-container img {
+            transform: scale(1.05);
+        }
+        
+        /* FIX 5: Simplified sidebar - removed blur */
+        .sidebar-glass {
+            background: rgba(0, 0, 0, 0.6);
+            /* backdrop-filter: blur(20px); - REMOVED */
+            border-right: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .sidebar-item {
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        
+        .sidebar-item:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateX(5px);
+        }
+        
+        /* Simplified footer - no blur */
+        .footer-glass {
+            background: rgba(0, 0, 0, 0.4);
+            /* backdrop-filter: blur(10px); - REMOVED */
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        
+        .overlay {
+            transition: all 0.3s ease;
+        }
+        
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: rgba(139, 92, 246, 0.5);
+            border-radius: 10px;
+        }
+        
+        .categories-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(139, 92, 246, 0.5) rgba(255, 255, 255, 0.1);
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .categories-scroll::-webkit-scrollbar {
+            height: 4px;
+        }
+        
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .toast-show {
+            animation: toastSlide 0.3s ease-out forwards;
+        }
+        
+        @keyframes toastSlide {
+            from {
+                transform: translateX(-50%) translateY(100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(-50%) translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .modal-animate {
+            animation: modalPop 0.3s ease-out forwards;
+        }
+        
+        @keyframes modalPop {
+            from {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        
+        .menu-btn {
+            transition: transform 0.2s ease;
+        }
+        
+        .menu-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+        
+        .like-button {
+            cursor: pointer;
+            transition: transform 0.15s ease;
+        }
+        
+        .like-button:active {
+            transform: scale(0.9);
+        }
+        
+        .image-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            /* backdrop-filter: blur(20px); - REMOVED from modal too */
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        
+        .image-modal.active {
+            display: flex;
+        }
+        
+        .image-modal-content {
+            max-width: 90vw;
+            max-height: 90vh;
+            object-fit: contain;
+            border-radius: 16px;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+        }
+        
+        .image-modal-close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: white;
+            font-size: 40px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            background: rgba(0,0,0,0.5);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .compact-title {
+            font-size: 0.9rem;
+            line-height: 1.2rem;
+            font-weight: 600;
+        }
+        
+        .compact-prompt {
+            font-size: 0.7rem;
+            line-height: 1rem;
+            color: rgba(255,255,255,0.6);
+        }
+        
+        /* Simplified banner ad container - no blur */
+        .banner-ad-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 25;
+            background: rgba(0, 0, 0, 0.85);
+            /* backdrop-filter: blur(10px); - REMOVED */
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 70px;
+            padding: 8px 12px;
+        }
+        
+        .banner-ad-container .ad-space {
+            width: 100%;
+            max-width: 728px;
+            margin: 0 auto;
+            text-align: center;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .ad-placeholder {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            border: 1px dashed rgba(255, 255, 255, 0.3);
+            width: 100%;
+        }
+        
+        @media (max-width: 768px) {
+            .container { padding-left: 12px; padding-right: 12px; }
+            .glass-card { border-radius: 16px; }
+            .image-modal-close { top: 15px; right: 15px; width: 40px; height: 40px; font-size: 30px; }
+            .compact-title { font-size: 0.8rem; }
+            .compact-prompt { font-size: 0.65rem; }
+            body { padding-bottom: 80px; }
+            .banner-ad-container { min-height: 70px; padding: 6px 10px; }
+        }
+        
+        .splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+        
+        .splash-screen.hide {
+            opacity: 0;
+            visibility: hidden;
+        }
+        
+        .splash-content {
+            text-align: center;
+            animation: splashPulse 1s ease-in-out infinite;
+        }
+        
+        @keyframes splashPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.9; }
+        }
+        
+        .splash-icon {
+            font-size: 80px;
+            color: white;
+            margin-bottom: 20px;
+            filter: drop-shadow(0 0 20px rgba(255,255,255,0.5));
+        }
+        
+        .splash-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: white;
+            letter-spacing: 2px;
+        }
+        
+        .monetag-modal-content {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background: transparent;
+        }
+        
+        .timer-text {
+            font-size: 48px;
+            font-weight: bold;
+            color: white;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .close-btn-disabled {
+            opacity: 0.5;
+            cursor: not-allowed !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- Splash Screen -->
+    <div id="splashScreen" class="splash-screen">
+        <div class="splash-content">
+            <div class="splash-icon"><i class="fas fa-magic"></i></div>
+            <div class="splash-title">Prompt Studio</div>
+        </div>
+    </div>
+
+    <!-- Image Modal for Full View -->
+    <div id="imageModal" class="image-modal" onclick="closeImageModal()">
+        <span class="image-modal-close">&times;</span>
+        <img id="modalImage" class="image-modal-content" alt="Full size prompt preview">
+    </div>
+
+    <!-- Sidebar Overlay -->
+    <div id="sidebarOverlay" class="overlay fixed inset-0 bg-black/50 z-40 hidden" onclick="closeSidebar()"></div>
+
+    <!-- Glassmorphism Sidebar Menu -->
+    <div id="sidebarMenu" class="fixed top-0 left-0 h-full w-80 sidebar-glass z-50 transform -translate-x-full transition-transform duration-200 ease-out shadow-2xl">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-8 pb-4 border-b border-white/20">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg">
+                        <i class="fas fa-magic text-white text-2xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-white font-bold text-xl">Prompt Studio</h2>
+                        <p class="text-white/50 text-xs">Elevate your creativity</p>
+                    </div>
+                </div>
+                <button onclick="closeSidebar()" class="text-white/70 hover:text-white text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="space-y-2">
+                <div onclick="handleMenuClick('follow')" class="sidebar-item flex items-center gap-4 px-4 py-3 rounded-xl text-white/90 hover:text-white">
+                    <i class="fab fa-instagram text-2xl w-8"></i><span class="font-medium">Follow Me</span>
+                </div>
+                <div onclick="handleMenuClick('howto')" class="sidebar-item flex items-center gap-4 px-4 py-3 rounded-xl text-white/90 hover:text-white">
+                    <i class="fas fa-question-circle text-2xl w-8"></i><span class="font-medium">How to Use</span>
+                </div>
+                <div onclick="handleMenuClick('share')" class="sidebar-item flex items-center gap-4 px-4 py-3 rounded-xl text-white/90 hover:text-white">
+                    <i class="fas fa-share-alt text-2xl w-8"></i><span class="font-medium">Share App</span>
+                </div>
+                <div onclick="handleMenuClick('rate')" class="sidebar-item flex items-center gap-4 px-4 py-3 rounded-xl text-white/90 hover:text-white">
+                    <i class="fas fa-star text-2xl w-8"></i><span class="font-medium">Rate Us</span>
+                </div>
+                <div onclick="handleMenuClick('contact')" class="sidebar-item flex items-center gap-4 px-4 py-3 rounded-xl text-white/90 hover:text-white">
+                    <i class="fas fa-envelope text-2xl w-8"></i><span class="font-medium">Contact Us</span>
+                </div>
+                <div onclick="handleMenuClick('developer')" class="sidebar-item flex items-center gap-4 px-4 py-3 rounded-xl text-white/90 hover:text-white">
+                    <i class="fas fa-code text-2xl w-8"></i><span class="font-medium">Developer Info</span>
+                </div>
+                <div onclick="handleMenuClick('privacy')" class="sidebar-item flex items-center gap-4 px-4 py-3 rounded-xl text-white/90 hover:text-white">
+                    <i class="fas fa-shield-alt text-2xl w-8"></i><span class="font-medium">Privacy Policy</span>
+                </div>
+            </div>
+            <div class="absolute bottom-6 left-6 right-6 pt-4 border-t border-white/20">
+                <p class="text-white/40 text-xs text-center">© 2025 Prompt Studio<br>Version 1.0.1-Stable</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Compact Navbar -->
+    <nav class="glass fixed top-2 left-1/2 transform -translate-x-1/2 z-30 px-4 py-2 w-[95%] max-w-6xl">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <button onclick="openSidebar()" class="menu-btn w-9 h-9 glass flex items-center justify-center rounded-full transition-all">
+                    <i class="fas fa-bars text-white text-lg"></i>
+                </button>
+                <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center shadow-lg">
+                    <i class="fas fa-magic text-white text-base"></i>
+                </div>
+                <div><h1 class="text-white font-bold text-base tracking-tight">Prompt Studio</h1></div>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1 bg-white/10 px-3 py-1 rounded-full">
+                    <i class="fas fa-chart-line text-purple-400 text-xs"></i>
+                    <span class="text-white text-xs font-medium" id="promptCount">0</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main id="mainContent">
+        <section class="pt-16 pb-2 px-4">
+            <div class="max-w-6xl mx-auto text-center">
+                <div class="inline-flex items-center gap-2 bg-white/10 backdrop-blur rounded-full px-3 py-1 mb-2">
+                    <i class="fas fa-bolt text-yellow-400 text-xs"></i>
+                    <span class="text-white/90 text-xs font-medium">Powered by Prompt Studio Atlas</span>
+                </div>
+                <h1 class="text-xl md:text-2xl font-bold text-white bg-gradient-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent">
+                    Generate Amazing AI Art
+                </h1>
+            </div>
+        </section>
+
+        <section class="px-4 mb-2">
+            <div class="max-w-6xl mx-auto">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-white/40 text-sm"></i>
+                    <input type="text" id="searchInput" placeholder="Search prompts..." 
+                           class="glass w-full px-12 py-2.5 text-white placeholder-white/50 text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500">
+                </div>
+            </div>
+        </section>
+
+        <section class="px-4 mb-3">
+            <div class="max-w-6xl mx-auto">
+                <div class="flex gap-2 overflow-x-auto pb-2 categories-scroll" id="categoriesContainer"></div>
+            </div>
+        </section>
+
+        <!-- FIX 6: Optimized grid - no animation classes during scroll -->
+        <section class="px-4 pb-20">
+            <div class="max-w-6xl mx-auto">
+                <div class="grid grid-cols-2 gap-3 md:gap-4" id="promptsGrid">
+                    <div class="skeleton h-64"></div>
+                    <div class="skeleton h-64"></div>
+                    <div class="skeleton h-64"></div>
+                    <div class="skeleton h-64"></div>
+                    <div class="skeleton h-64"></div>
+                    <div class="skeleton h-64"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer-glass mt-8">
+        <div class="max-w-6xl mx-auto px-4 py-4">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-3 mb-3">
+                <div class="text-center md:text-left">
+                    <div class="flex items-center gap-2 justify-center md:justify-start">
+                        <div class="w-7 h-7 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center shadow-lg">
+                            <i class="fas fa-magic text-white text-xs"></i>
+                        </div>
+                        <div><h3 class="text-white font-bold text-sm">Prompt Studio</h3><p class="text-white/50 text-xs">Elevate your creativity</p></div>
+                    </div>
+                </div>
+                <div class="flex gap-4">
+                    <a href="#" onclick="handleMenuClick('privacy')" class="text-white/60 hover:text-white text-xs transition-colors">Privacy</a>
+                    <a href="#" onclick="showToast('📜 Terms of Service: Use responsibly', 3000)" class="text-white/60 hover:text-white text-xs transition-colors">Terms</a>
+                    <a href="#" onclick="handleMenuClick('contact')" class="text-white/60 hover:text-white text-xs transition-colors">Contact</a>
+                </div>
+                <div class="flex gap-3">
+                    <a href="#" onclick="window.open('https://instagram.com', '_blank')" class="w-7 h-7 glass flex items-center justify-center rounded-full transition-all hover:scale-110 hover:bg-white/20"><i class="fab fa-instagram text-white text-xs"></i></a>
+                    <a href="#" onclick="window.open('https://youtube.com', '_blank')" class="w-7 h-7 glass flex items-center justify-center rounded-full transition-all hover:scale-110 hover:bg-white/20"><i class="fab fa-youtube text-white text-xs"></i></a>
+                    <a href="#" onclick="window.open('https://github.com', '_blank')" class="w-7 h-7 glass flex items-center justify-center rounded-full transition-all hover:scale-110 hover:bg-white/20"><i class="fab fa-github text-white text-xs"></i></a>
+                </div>
+            </div>
+            <div class="border-t border-white/10 my-3"></div>
+            <div class="flex flex-col md:flex-row justify-between items-center gap-2">
+                <p class="text-white/40 text-xs text-center">© 2025 Prompt Studio. All rights reserved.</p>
+                <div class="flex items-center gap-2"><span class="text-white/30 text-xs">v1.0.1-Stable</span><span class="text-white/20 text-xs">•</span><span class="text-white/30 text-xs">Built with ❤️</span></div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Banner Ad Container -->
+    <div id="bannerAdContainer" class="banner-ad-container">
+        <div class="ad-space">
+            <div class="ad-placeholder" id="bannerAdPlaceholder">
+                <script type="text/javascript">
+                    atOptions = {
+                        'key' : 'e9d01f858e3adc8437cbab86756087f4',
+                        'format' : 'iframe',
+                        'height' : 50,
+                        'width' : 320,
+                        'params' : {}
+                    };
+                </script>
+                <script type="text/javascript" src="//www.highperformanceformat.com/e9d01f858e3adc8437cbab86756087f4/invoke.js"></script>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monetag Vignette Modal -->
+    <div id="adModal" class="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center hidden">
+        <div class="glass-card p-6 max-w-md mx-4 w-full modal-animate">
+            <div class="text-center monetag-modal-content">
+                <div class="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-video text-white text-3xl"></i>
+                </div>
+                <h3 class="text-white text-2xl font-bold mb-2">Watch Ad to Copy</h3>
+                <p class="text-white/70 mb-4">Please watch the ad below to unlock copy</p>
+                <div id="adTimer" class="timer-text text-4xl font-bold text-yellow-400 mb-4">15s</div>
+                <div id="monetagScriptContainer" class="mb-4"></div>
+                <button id="closeAdBtn" class="w-full bg-gradient-to-r from-gray-500 to-gray-600 text-white font-semibold py-3 rounded-xl transition-all close-btn-disabled" disabled>
+                    Please wait 15 seconds...
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Exit Modal -->
+    <div id="exitModal" class="fixed inset-0 bg-black/70 z-[150] flex items-center justify-center hidden">
+        <div class="glass-card p-6 max-w-md mx-4 modal-animate">
+            <div class="text-center">
+                <div class="w-20 h-20 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-sign-out-alt text-white text-3xl"></i>
+                </div>
+                <h3 class="text-white text-2xl font-bold mb-2">Exit App?</h3>
+                <p class="text-white/70 mb-6">Are you sure you want to exit?</p>
+                <div class="flex gap-3">
+                    <button id="confirmExitBtn" class="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold py-3 rounded-xl transition-all">Exit</button>
+                    <button id="cancelExitBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 rounded-xl transition-all">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-[200] hidden">
+        <div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-full flex items-center gap-2 shadow-2xl">
+            <i class="fas fa-spinner fa-spin"></i>
+            <span id="toastMessage">Loading...</span>
+        </div>
+    </div>
+
+    <script>
+        // ========== GLOBAL VARIABLES ==========
+        let pendingPromptText = null;
+        let currentCopyButton = null;
+        let adTimerInterval = null;
+        let remainingSeconds = 15;
+        let isAdCompleted = false;
+        let monetagScriptLoaded = false;
+        let currentPrompts = [];
+        let currentCategory = 'All';
+        let currentSearchTerm = '';
+        let allPromptsLoaded = [];
+        let isLoadingMore = false;
+        let currentPage = 0;
+        
+        // FIX 7: INCREMENTAL RENDERING - Only load items in chunks
+        const ITEMS_PER_PAGE = 12;
+        let renderedCount = 0;
+        let loadMoreObserver = null;
+        
+        // Kodular ke Back Button ke liye Main Function
+        function handleBackPress() {
+            const sidebar = document.getElementById('sidebarMenu');
+            if (sidebar && !sidebar.classList.contains('-translate-x-full')) {
+                sidebar.classList.add('-translate-x-full'); 
+                return;
+            }
+            const imageModal = document.getElementById('imageModal');
+            if (imageModal && imageModal.classList.contains('active')) {
+                imageModal.classList.remove('active');
+                return;
+            }
+            openExitPopup();
+        }
+
+        function openExitPopup() {
+            const exitModal = document.getElementById('exitModal');
+            if (exitModal) exitModal.classList.remove('hidden');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const cancelBtn = document.getElementById('cancelExitBtn');
+            const confirmBtn = document.getElementById('confirmExitBtn');
+            if (cancelBtn) cancelBtn.onclick = () => document.getElementById('exitModal').classList.add('hidden');
+            if (confirmBtn) confirmBtn.onclick = () => window.close();
+        });
+
+        // ========== TOAST FUNCTIONS ==========
+        function showToast(message, isError = false, duration = 2000) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMessage');
+            const toastIcon = toast.querySelector('i');
+            toastMsg.textContent = message;
+            if (isError) {
+                toastIcon.className = 'fas fa-exclamation-circle mr-2';
+                toast.querySelector('div').className = 'bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-3 rounded-full flex items-center gap-2 shadow-2xl';
+            } else {
+                toastIcon.className = 'fas fa-spinner fa-spin mr-2';
+                toast.querySelector('div').className = 'bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-full flex items-center gap-2 shadow-2xl';
+            }
+            toast.classList.remove('hidden');
+            toast.classList.add('toast-show');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+                toast.classList.remove('toast-show');
+            }, duration);
+        }
+        
+        function showSuccessToast(message, duration = 2000) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMessage');
+            toastMsg.textContent = message;
+            toast.querySelector('div').className = 'bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3 rounded-full flex items-center gap-2 shadow-2xl';
+            toast.querySelector('i').className = 'fas fa-check-circle mr-2';
+            toast.classList.remove('hidden');
+            toast.classList.add('toast-show');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+                toast.classList.remove('toast-show');
+            }, duration);
+        }
+
+        // ========== LOAD MONETAG VIGNETTE SCRIPT ==========
+        function loadMonetagVignette() {
+            if (monetagScriptLoaded) return;
+            const container = document.getElementById('monetagScriptContainer');
+            if (!container) return;
+            container.innerHTML = '';
+            const script = document.createElement('script');
+            script.innerHTML = `(function(s){s.dataset.zone='10920892',s.src='https://n6wxm.com/vignette.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))`;
+            container.appendChild(script);
+            monetagScriptLoaded = true;
+        }
+
+        // ========== START TIMER ==========
+        function startAdTimer() {
+            remainingSeconds = 15;
+            isAdCompleted = false;
+            const timerDisplay = document.getElementById('adTimer');
+            const closeBtn = document.getElementById('closeAdBtn');
+            closeBtn.disabled = true;
+            closeBtn.innerHTML = 'Please wait 15 seconds...';
+            closeBtn.classList.add('close-btn-disabled');
+            if (adTimerInterval) clearInterval(adTimerInterval);
+            adTimerInterval = setInterval(() => {
+                remainingSeconds--;
+                if (timerDisplay) timerDisplay.textContent = `${remainingSeconds}s`;
+                if (remainingSeconds <= 0) {
+                    clearInterval(adTimerInterval);
+                    adTimerInterval = null;
+                    isAdCompleted = true;
+                    closeBtn.disabled = false;
+                    closeBtn.innerHTML = '✓ Close & Copy Prompt';
+                    closeBtn.classList.remove('close-btn-disabled');
+                    closeBtn.classList.add('bg-gradient-to-r', 'from-green-500', 'to-emerald-600');
+                }
+            }, 1000);
+        }
+
+        function stopAdTimer() { if (adTimerInterval) { clearInterval(adTimerInterval); adTimerInterval = null; } }
+
+        // ========== COPY BUTTON LOGIC ==========
+        function handleCopyClick(text, buttonElement) {
+            pendingPromptText = text;
+            currentCopyButton = buttonElement;
+            const originalHTML = buttonElement.innerHTML;
+            buttonElement.disabled = true;
+            buttonElement.innerHTML = '<i class="fas fa-spinner fa-spin text-xs"></i>';
+            showToast('⏳ Loading ad...', false, 1500);
+            setTimeout(() => {
+                buttonElement.disabled = false;
+                buttonElement.innerHTML = originalHTML;
+                const adModal = document.getElementById('adModal');
+                adModal.classList.remove('hidden');
+                loadMonetagVignette();
+                startAdTimer();
+            }, 1000);
+        }
+
+        function closeAdModalAndCopy() {
+            if (!isAdCompleted) { showToast('Please wait for the ad to complete!', true, 2000); return; }
+            if (pendingPromptText) copyToClipboard(pendingPromptText);
+            pendingPromptText = null;
+            stopAdTimer();
+            const timerDisplay = document.getElementById('adTimer');
+            if (timerDisplay) timerDisplay.textContent = '15s';
+            document.getElementById('adModal').classList.add('hidden');
+            const closeBtn = document.getElementById('closeAdBtn');
+            closeBtn.disabled = true;
+            closeBtn.innerHTML = 'Please wait 15 seconds...';
+            closeBtn.classList.add('close-btn-disabled');
+            closeBtn.classList.remove('bg-gradient-to-r', 'from-green-500', 'to-emerald-600');
+            isAdCompleted = false;
+            if (currentCopyButton) currentCopyButton = null;
+        }
+
+        function closeAdModal() {
+            stopAdTimer();
+            const timerDisplay = document.getElementById('adTimer');
+            if (timerDisplay) timerDisplay.textContent = '15s';
+            document.getElementById('adModal').classList.add('hidden');
+            const closeBtn = document.getElementById('closeAdBtn');
+            closeBtn.disabled = true;
+            closeBtn.innerHTML = 'Please wait 15 seconds...';
+            closeBtn.classList.add('close-btn-disabled');
+            closeBtn.classList.remove('bg-gradient-to-r', 'from-green-500', 'to-emerald-600');
+            pendingPromptText = null;
+            currentCopyButton = null;
+            isAdCompleted = false;
+        }
+
+        async function copyToClipboard(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                showSuccessToast('✅ Prompt copied to clipboard!', 2000);
+            } catch (err) {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showSuccessToast('✅ Prompt copied!', 2000);
+            }
+        }
+
+        // ========== SPLASH SCREEN ==========
+        setTimeout(() => {
+            const splash = document.getElementById('splashScreen');
+            splash.classList.add('hide');
+            setTimeout(() => { splash.style.display = 'none'; }, 500);
+        }, 2000);
+
+        // ========== MODAL FUNCTIONS ==========
+        function isAnyModalOpen() {
+            const imageModal = document.getElementById('imageModal');
+            const adModal = document.getElementById('adModal');
+            const sidebar = document.getElementById('sidebarMenu');
+            return (imageModal && imageModal.classList.contains('active')) ||
+                   (adModal && !adModal.classList.contains('hidden')) ||
+                   (sidebar && !sidebar.classList.contains('-translate-x-full'));
+        }
+
+        function closeAllModals() { closeImageModal(); closeAdModal(); closeSidebar(); }
+
+        // ========== UPDATED: openImageModal WITH TRACKING ==========
+        function openImageModal(imageUrl, promptId) {
+            if (promptId) trackView(promptId);
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            modal.classList.add('active');
+            modalImg.src = imageUrl;
+            document.body.style.overflow = 'hidden';
+            history.pushState({ modal: 'image' }, null, null);
+        }
+
+        function closeImageModal() {
+            const modal = document.getElementById('imageModal');
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        // ========== trackView FUNCTION ==========
+        async function trackView(promptId) {
+            try {
+                await fetch('/api/prompt/view', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: promptId })
+                });
+            } catch (error) {
+                console.error('Error tracking view:', error);
+            }
+        }
+
+        function openSidebar() {
+            const sidebar = document.getElementById('sidebarMenu');
+            const overlay = document.getElementById('sidebarOverlay');
+            sidebar.classList.remove('-translate-x-full');
+            sidebar.classList.add('translate-x-0');
+            overlay.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            history.pushState({ modal: 'sidebar' }, null, null);
+        }
+
+        function closeSidebar() {
+            const sidebar = document.getElementById('sidebarMenu');
+            const overlay = document.getElementById('sidebarOverlay');
+            sidebar.classList.remove('translate-x-0');
+            sidebar.classList.add('-translate-x-full');
+            overlay.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        function showExitModal() { document.getElementById('exitModal').classList.remove('hidden'); }
+        function hideExitModal() { document.getElementById('exitModal').classList.add('hidden'); }
+        function exitApp() {
+            if (window.AppInventor && window.AppInventor.setWebViewString) window.AppInventor.setWebViewString('exit');
+            else { window.close(); window.history.back(); }
+            hideExitModal();
+        }
+
+        // ========== SWIPE TO REFRESH ==========
+        let touchStartY = 0;
+        let isRefreshing = false;
+        const REFRESH_THRESHOLD = 100;
+        document.addEventListener('touchstart', (e) => { touchStartY = e.touches[0].clientY; }, { passive: true });
+        document.addEventListener('touchmove', (e) => {
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const swipeDistance = e.touches[0].clientY - touchStartY;
+            if (scrollTop === 0 && swipeDistance > REFRESH_THRESHOLD && !isRefreshing) {
+                e.preventDefault();
+                refreshPage();
+            }
+        }, { passive: false });
+        
+        function refreshPage() {
+            isRefreshing = true;
+            showToast('🔄 Refreshing...', false, 1500);
+            fetchPrompts();
+            setTimeout(() => { isRefreshing = false; showSuccessToast('✓ Page refreshed!', 1500); }, 2000);
+        }
+
+        // ========== MENU HANDLER ==========
+        function handleMenuClick(action) {
+            closeSidebar();
+            switch(action) {
+                case 'follow': showSuccessToast('📱 Follow us on Instagram: @promptstudio', 3000); setTimeout(() => window.open('https://instagram.com', '_blank'), 1500); break;
+                case 'howto': showToast('📖 How to Use: 1. Browse prompts 2. Click Copy 3. Watch ad 4. Paste in Midjourney/DALL-E', false, 4000); break;
+                case 'share': if (navigator.share) { navigator.share({ title: 'Prompt Studio', text: 'Check out this amazing AI Prompt collection!', url: window.location.href }).catch(() => showToast('✨ Share cancelled', false, 1500)); } else { navigator.clipboard.writeText(window.location.href); showSuccessToast('🔗 Link copied to clipboard!', 2000); } break;
+                case 'rate': showToast('⭐ Rate us 5 stars on the app store!', false, 2000); break;
+                case 'contact': showToast('📧 Contact: support@promptstudio.com', false, 3000); break;
+                case 'developer': showToast('👨‍💻 Developed by Prompt Studio Team\nVersion 1.0.1-Stable', false, 4000); break;
+                case 'privacy': showToast('🔒 Privacy Policy: We don\'t store your personal data.', false, 4000); break;
+                default: showToast('✨ Feature coming soon!', false, 1500);
+            }
+        }
+
+        // ========== FETCH PROMPTS WITH INCREMENTAL RENDERING ==========
+        async function fetchPrompts() {
+            try {
+                const grid = document.getElementById('promptsGrid');
+                if (grid) grid.innerHTML = `<div class="skeleton h-64"></div><div class="skeleton h-64"></div><div class="skeleton h-64"></div><div class="skeleton h-64"></div><div class="skeleton h-64"></div><div class="skeleton h-64"></div>`;
+                const response = await fetch('/api/prompts');
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Failed to fetch prompts');
+                let prompts = [];
+                if (data.prompts) prompts = data.prompts;
+                else if (Array.isArray(data)) prompts = data;
+                allPromptsLoaded = prompts.map(prompt => ({ ...prompt, isLiked: false }));
+                currentPrompts = [...allPromptsLoaded];
+                await renderCategories();
+                // FIX 9: Reset rendered count and load first chunk only
+                renderedCount = 0;
+                currentPage = 0;
+                filterPromptsAndRender(true); // Load first chunk
+                const countElem = document.getElementById('promptCount');
+                if (countElem) countElem.textContent = `${currentPrompts.length}`;
+            } catch (error) { 
+                console.error('Error fetching prompts:', error); 
+                showError('Failed to load prompts.'); 
+            }
+        }
+
+        // FIX 10: INCREMENTAL RENDERING - Load more items on scroll
+        function setupInfiniteScroll() {
+            if (loadMoreObserver) loadMoreObserver.disconnect();
+            loadMoreObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting && !isLoadingMore && renderedCount < currentPrompts.length) {
+                        loadMoreItems();
+                    }
+                });
+            }, { threshold: 0.1, rootMargin: '200px' });
+            
+            const sentinel = document.getElementById('loadMoreSentinel');
+            if (sentinel) loadMoreObserver.observe(sentinel);
+        }
+        
+        function loadMoreItems() {
+            if (isLoadingMore || renderedCount >= currentPrompts.length) return;
+            isLoadingMore = true;
+            const nextBatch = currentPrompts.slice(renderedCount, renderedCount + ITEMS_PER_PAGE);
+            appendPrompts(nextBatch);
+            renderedCount += nextBatch.length;
+            isLoadingMore = false;
+        }
+        
+        function appendPrompts(prompts) {
+            const grid = document.getElementById('promptsGrid');
+            if (!grid) return;
+            const newCards = prompts.map((prompt, idx) => `
+                <div class="glass-card transition-all duration-200">
+                    <div class="image-container" onclick="openImageModal('${prompt.imageUrl || 'https://picsum.photos/400/600'}', '${prompt._id}')">
+                        <img src="${prompt.imageUrl || 'https://picsum.photos/400/600'}" 
+                             alt="${escapeHtml(prompt.title)}" 
+                             loading="lazy"
+                             onerror="this.src='https://picsum.photos/400/600'">
+                        <div class="absolute top-2 right-2 glass px-1.5 py-0.5 rounded-full text-xs text-white">
+                            <i class="fas fa-eye text-xs"></i> <span class="view-count" data-id="${prompt._id}">${formatNumber(prompt.views || 0)}</span>
+                        </div>
+                        <div class="absolute bottom-2 left-2 glass px-1.5 py-0.5 rounded-full text-xs text-white">
+                            ${escapeHtml(prompt.category || 'General')}
+                        </div>
+                    </div>
+                    <div class="p-2">
+                        <h3 class="text-white font-semibold compact-title mb-1 line-clamp-1">${escapeHtml(prompt.title)}</h3>
+                        <p class="compact-prompt mb-2 line-clamp-2">${escapeHtml(prompt.prompt || 'No prompt available')}</p>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-1">
+                                <button onclick="handleLike('${prompt._id}')" class="like-button transition-all hover:scale-110" data-id="${prompt._id}">
+                                    <i class="fas fa-heart ${prompt.isLiked ? 'text-red-500' : 'text-white/60'} text-xs"></i>
+                                </button>
+                                <span class="text-white/70 text-xs like-count" data-id="${prompt._id}">${formatNumber(prompt.likes || 0)}</span>
+                            </div>
+                            <button onclick="handleCopyClick('${escapeHtml(prompt.prompt).replace(/'/g, "\\'")}', this)" 
+                                    class="copy-btn bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-2 py-1 rounded-full text-xs font-semibold transition-all flex items-center gap-1">
+                                <i class="fas fa-copy text-xs"></i> Copy
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Remove sentinel if exists, then add new cards, then re-add sentinel
+            const sentinel = document.getElementById('loadMoreSentinel');
+            if (sentinel) sentinel.remove();
+            grid.insertAdjacentHTML('beforeend', newCards);
+            if (renderedCount + prompts.length < currentPrompts.length) {
+                grid.insertAdjacentHTML('beforeend', '<div id="loadMoreSentinel" class="col-span-full h-4"></div>');
+                setupInfiniteScroll();
+            }
+        }
+
+        // ========== RENDER PROMPTS WITH INCREMENTAL LOADING ==========
+        function renderPrompts(prompts, isInitial = false) {
+            const grid = document.getElementById('promptsGrid');
+            if (!grid) return;
+            if (!prompts || prompts.length === 0) { 
+                grid.innerHTML = `<div class="col-span-2 text-center py-12"><i class="fas fa-inbox text-white/40 text-6xl mb-4"></i><p class="text-white/60 text-lg">No prompts found</p></div>`; 
+                return; 
+            }
+            
+            // Only render first chunk
+            const firstChunk = prompts.slice(0, ITEMS_PER_PAGE);
+            renderedCount = firstChunk.length;
+            
+            grid.innerHTML = firstChunk.map((prompt, index) => `
+                <div class="glass-card transition-all duration-200">
+                    <div class="image-container" onclick="openImageModal('${prompt.imageUrl || 'https://picsum.photos/400/600'}', '${prompt._id}')">
+                        <img src="${prompt.imageUrl || 'https://picsum.photos/400/600'}" 
+                             alt="${escapeHtml(prompt.title)}" 
+                             loading="lazy"
+                             onerror="this.src='https://picsum.photos/400/600'">
+                        <div class="absolute top-2 right-2 glass px-1.5 py-0.5 rounded-full text-xs text-white">
+                            <i class="fas fa-eye text-xs"></i> <span class="view-count" data-id="${prompt._id}">${formatNumber(prompt.views || 0)}</span>
+                        </div>
+                        <div class="absolute bottom-2 left-2 glass px-1.5 py-0.5 rounded-full text-xs text-white">
+                            ${escapeHtml(prompt.category || 'General')}
+                        </div>
+                    </div>
+                    <div class="p-2">
+                        <h3 class="text-white font-semibold compact-title mb-1 line-clamp-1">${escapeHtml(prompt.title)}</h3>
+                        <p class="compact-prompt mb-2 line-clamp-2">${escapeHtml(prompt.prompt || 'No prompt available')}</p>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-1">
+                                <button onclick="handleLike('${prompt._id}')" class="like-button transition-all hover:scale-110" data-id="${prompt._id}">
+                                    <i class="fas fa-heart ${prompt.isLiked ? 'text-red-500' : 'text-white/60'} text-xs"></i>
+                                </button>
+                                <span class="text-white/70 text-xs like-count" data-id="${prompt._id}">${formatNumber(prompt.likes || 0)}</span>
+                            </div>
+                            <button onclick="handleCopyClick('${escapeHtml(prompt.prompt).replace(/'/g, "\\'")}', this)" 
+                                    class="copy-btn bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-2 py-1 rounded-full text-xs font-semibold transition-all flex items-center gap-1">
+                                <i class="fas fa-copy text-xs"></i> Copy
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Add sentinel for infinite scroll if more items exist
+            if (prompts.length > ITEMS_PER_PAGE) {
+                grid.insertAdjacentHTML('beforeend', '<div id="loadMoreSentinel" class="col-span-full h-4"></div>');
+                setupInfiniteScroll();
+            }
+        }
+
+        // ========== FILTER FUNCTIONS with debounce ==========
+        let debounceTimer = null;
+        
+        function filterPromptsAndRender(isInitial = false) {
+            let filtered = [...allPromptsLoaded];
+            if (currentCategory !== 'All') {
+                filtered = filtered.filter(p => p.category === currentCategory);
+            }
+            if (currentSearchTerm.trim()) {
+                const searchLower = currentSearchTerm.toLowerCase();
+                filtered = filtered.filter(p => p.title.toLowerCase().includes(searchLower) || (p.prompt || '').toLowerCase().includes(searchLower));
+            }
+            currentPrompts = filtered;
+            renderPrompts(currentPrompts, isInitial);
+            const countElem = document.getElementById('promptCount');
+            if (countElem) countElem.textContent = `${currentPrompts.length}`;
+        }
+
+        function filterCategory(category) {
+            currentCategory = category;
+            filterPromptsAndRender(true);
+            document.querySelectorAll('[data-category-btn]').forEach(btn => {
+                btn.classList.remove('bg-gradient-to-r', 'from-purple-500', 'to-pink-500', 'text-white', 'shadow-lg');
+                btn.classList.add('glass', 'text-white/80');
+            });
+            const activeBtn = document.querySelector(`[data-category-btn="${category}"]`);
+            if (activeBtn) {
+                activeBtn.classList.remove('glass', 'text-white/80');
+                activeBtn.classList.add('bg-gradient-to-r', 'from-purple-500', 'to-pink-500', 'text-white', 'shadow-lg');
+            }
+        }
+
+        async function renderCategories() {
+            try {
+                let categories = ['All', 'Portrait', 'Trending', 'Nature', 'Cinematic', 'Birthday', 'Bike'];
+                const container = document.getElementById('categoriesContainer');
+                if (!container) return;
+                container.innerHTML = categories.map(cat => `<button data-category-btn="${cat}" onclick="filterCategory('${cat}')" class="px-3 py-1 rounded-full transition-all whitespace-nowrap text-sm ${currentCategory === cat ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg' : 'glass text-white/80 hover:bg-white/20'}">${cat}</button>`).join('');
+            } catch (error) { console.error('Error rendering categories:', error); }
+        }
+
+        async function handleLike(id) {
+            try {
+                const promptIndex = currentPrompts.findIndex(p => p._id === id);
+                if (promptIndex === -1) return;
+                const wasLiked = currentPrompts[promptIndex].isLiked;
+                if (wasLiked) { currentPrompts[promptIndex].likes--; currentPrompts[promptIndex].isLiked = false; } 
+                else { currentPrompts[promptIndex].likes++; currentPrompts[promptIndex].isLiked = true; }
+                updateLikeUI(id, currentPrompts[promptIndex].likes, currentPrompts[promptIndex].isLiked);
+                const response = await fetch('/api/prompt/like', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) });
+                if (!response.ok) throw new Error('Failed to update like');
+            } catch (error) { console.error('Error updating like:', error); showToast('Error updating like.', true, 3000); }
+        }
+
+        function updateLikeUI(id, likes, isLiked) {
+            const likeCountSpan = document.querySelector(`.like-count[data-id="${id}"]`);
+            if (likeCountSpan) likeCountSpan.textContent = formatNumber(likes);
+            const likeButton = document.querySelector(`.like-button[data-id="${id}"] i`);
+            if (likeButton) {
+                if (isLiked) { likeButton.classList.remove('text-white/60'); likeButton.classList.add('text-red-500'); } 
+                else { likeButton.classList.remove('text-red-500'); likeButton.classList.add('text-white/60'); }
+            }
+        }
+
+        function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+        function formatNumber(num) { if (!num) return '0'; if (num >= 1000) return (num / 1000).toFixed(1) + 'k'; return num.toString(); }
+        function showError(message) { const grid = document.getElementById('promptsGrid'); if (grid) { grid.innerHTML = `<div class="col-span-2 text-center py-12"><i class="fas fa-exclamation-triangle text-yellow-400 text-6xl mb-4"></i><p class="text-white/80 text-lg">${message}</p><button onclick="fetchPrompts()" class="mt-4 glass px-6 py-2 rounded-full text-white hover:bg-white/20 transition-all">Try Again</button></div>`; } }
+
+        // FIX 11: DEBOUNCED SEARCH INPUT (replaced direct filter)
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            if (debounceTimer) clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                currentSearchTerm = e.target.value;
+                filterPromptsAndRender(true);
+            }, 300);
+        });
+        
+        document.getElementById('closeAdBtn').addEventListener('click', closeAdModalAndCopy);
+        document.getElementById('confirmExitBtn').addEventListener('click', exitApp);
+        document.getElementById('cancelExitBtn').addEventListener('click', hideExitModal);
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSidebar(); if (!document.getElementById('adModal').classList.contains('hidden')) closeAdModal(); if (!document.getElementById('exitModal').classList.contains('hidden')) hideExitModal(); } });
+
+        // ========== INITIALIZE ==========
+        document.addEventListener('DOMContentLoaded', () => { fetchPrompts(); });
+
+        // ========== 🔴 BACK BUTTON HANDLING LOGIC - ADDED AT THE END ==========
+        // This code handles:
+        // 1. When sidebar is open → closes sidebar
+        // 2. When image modal is open → closes modal
+        // 3. Otherwise shows Exit popup with Cancel/Exit buttons
+        
+        // Get references to all modal elements
+        const sidebarMenu = document.getElementById('sidebarMenu');
+        const imageModalElem = document.getElementById('imageModal');
+        const exitModalElem = document.getElementById('exitModal');
+        const confirmExitBtn = document.getElementById('confirmExitBtn');
+        const cancelExitBtn = document.getElementById('cancelExitBtn');
+        
+        // Function to check if sidebar is open
+        function isSidebarOpen() {
+            return sidebarMenu && !sidebarMenu.classList.contains('-translate-x-full');
+        }
+        
+        // Function to check if image modal is open
+        function isImageModalOpen() {
+            return imageModalElem && imageModalElem.classList.contains('active');
+        }
+        
+        // Close sidebar function
+        function closeSidebarMenu() {
+            if (sidebarMenu) {
+                sidebarMenu.classList.remove('translate-x-0');
+                sidebarMenu.classList.add('-translate-x-full');
+                const overlay = document.getElementById('sidebarOverlay');
+                if (overlay) overlay.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
+        }
+        
+        // Close image modal function
+        function closeImageModalWindow() {
+            if (imageModalElem) {
+                imageModalElem.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        }
+        
+        // Show exit confirmation popup
+        function showExitConfirmation() {
+            if (exitModalElem) {
+                exitModalElem.classList.remove('hidden');
+            }
+        }
+        
+        // Hide exit confirmation popup
+        function hideExitConfirmation() {
+            if (exitModalElem) {
+                exitModalElem.classList.add('hidden');
+            }
+        }
+        
+        // Exit app function
+        function exitApplication() {
+            hideExitConfirmation();
+            // Try to close the app (works in WebView/App Inventor)
+            if (window.AppInventor && window.AppInventor.setWebViewString) {
+                window.AppInventor.setWebViewString('exit');
+            } else {
+                // Browser fallback
+                window.close();
+                // If window.close doesn't work, try history back
+                window.history.back();
+            }
+        }
+        
+        // Main back button handler (Android hardware back button)
+        function handleAndroidBackButton() {
+            // Priority 1: Check if sidebar is open
+            if (isSidebarOpen()) {
+                closeSidebarMenu();
+                return true; // Handled
+            }
+            
+            // Priority 2: Check if image modal is open
+            if (isImageModalOpen()) {
+                closeImageModalWindow();
+                return true; // Handled
+            }
+            
+            // Priority 3: No modal open, show exit popup
+            showExitConfirmation();
+            return true; // Handled
+        }
+        
+        // Attach exit modal button event listeners
+        if (confirmExitBtn) {
+            confirmExitBtn.onclick = function() {
+                exitApplication();
+            };
+        }
+        
+        if (cancelExitBtn) {
+            cancelExitBtn.onclick = function() {
+                hideExitConfirmation();
+            };
+        }
+        
+        // Override the existing onpopstate to work with our new logic
+        // Store original popstate handler
+        const originalPopState = window.onpopstate;
+        
+        // Set new popstate handler
+        window.onpopstate = function(event) {
+            // Check if any modal is open
+            if (isSidebarOpen()) {
+                closeSidebarMenu();
+                // Push new state to prevent exit
+                history.pushState({ page: 'home' }, null, null);
+                showSuccessToast('Sidebar closed', 1000);
+                return;
+            }
+            
+            if (isImageModalOpen()) {
+                closeImageModalWindow();
+                history.pushState({ page: 'home' }, null, null);
+                showSuccessToast('Image viewer closed', 1000);
+                return;
+            }
+            
+            if (event.state && event.state.modal === 'image') {
+                closeImageModalWindow();
+                return;
+            }
+            
+            if (event.state && event.state.modal === 'sidebar') {
+                closeSidebarMenu();
+                return;
+            }
+            
+            // No modal open, show exit popup
+            showExitConfirmation();
+            // Push a new state to keep the app alive
+            history.pushState({ page: 'home' }, null, null);
+        };
+        
+        // Override the existing openImageModal to also push state
+        const originalOpenImageModal = window.openImageModal;
+        window.openImageModal = function(imageUrl, promptId) {
+            if (originalOpenImageModal) {
+                originalOpenImageModal(imageUrl, promptId);
+            }
+            history.pushState({ modal: 'image' }, null, null);
+        };
+        
+        // Override the existing openSidebar to also push state
+        const originalOpenSidebar = window.openSidebar;
+        window.openSidebar = function() {
+            if (originalOpenSidebar) {
+                originalOpenSidebar();
+            }
+            history.pushState({ modal: 'sidebar' }, null, null);
+        };
+        
+        // Add a dedicated hardware back button listener for Android WebView
+        // This works with the standard 'backbutton' event in WebView
+        document.addEventListener('backbutton', function(e) {
+            e.preventDefault();
+            handleAndroidBackButton();
+        });
+        
+        // Also handle regular popstate for browser environments
+        // Push initial state to prevent immediate exit on first back press
+        if (!history.state) {
+            history.pushState({ page: 'home' }, null, null);
+        }
+        
+        console.log('✅ Back button handler initialized');
+        console.log('   - Sidebar open → closes sidebar');
+        console.log('   - Image modal open → closes modal');
+        console.log('   - Otherwise → shows exit popup with Cancel/Exit');
+        
+        function handleBackPress() {
+    if (!sidebarMenu.classList.contains('-translate-x-full')) {
+        closeSidebar();
+    } else if (imageModal.classList.contains('active')) {
+        closeImageModal();
+    } else {
+        document.getElementById('exitModal').classList.remove('hidden');
+    }
+}
+    </script>
+</body>
+</html>
