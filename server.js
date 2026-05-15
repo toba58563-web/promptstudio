@@ -4,26 +4,22 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
-const admin = require('firebase-admin'); // ✅ Firebase Admin SDK import
+const admin = require('firebase-admin');
 
-// ✅ Initialize Firebase Admin SDK from Environment Variable (Render)
-// The FIREBASE_CONFIG env variable should contain the JSON string of your service account
+// ✅ Initialize Firebase Admin SDK from Environment Variable
 const serviceAccount = JSON.parse(process.env.FIREBASE_CONFIG);
 
 if (!admin.apps.length) {
     admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
     });
-    console.log('✅ Firebase Admin SDK initialized successfully from environment variable');
-} else {
-    console.log('ℹ️ Firebase Admin SDK already initialized');
+    console.log('✅ Firebase Admin SDK initialized successfully');
 }
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ========== MIDDLEWARE ==========
-// ✅ CORS properly configured to accept requests from any origin (including Render frontend)
 app.use(cors({
     origin: true,
     credentials: true,
@@ -52,19 +48,16 @@ const adminSchema = new mongoose.Schema({
 
 const Admin = mongoose.model('Admin', adminSchema);
 
-// ========== USER SCHEMA (ADDED FOR STATS) ==========
-// Since your admin.html expects user stats, we'll create a basic User schema
-// If you already have a User model elsewhere, you can remove this and uncomment the import
+// ========== USER SCHEMA ==========
 const userSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true },
     lastLogin: { type: Date, default: Date.now },
     createdAt: { type: Date, default: Date.now }
 });
 
-// Only create User model if it doesn't exist already
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
-// ========== INITIALIZE DEFAULT ADMIN IF NOT EXISTS ==========
+// ========== INITIALIZE DEFAULT ADMIN ==========
 async function initializeDefaultAdmin() {
     try {
         const existingAdmin = await Admin.findOne({ email: process.env.ADMIN_EMAIL });
@@ -110,19 +103,16 @@ app.post('/api/admin/login', async (req, res) => {
     try {
         const { email, password } = req.body;
         
-        // Find admin by email
         const admin = await Admin.findOne({ email });
         if (!admin) {
             return res.status(401).json({ success: false, error: 'Invalid credentials' });
         }
         
-        // Check password
         const isPasswordValid = await bcrypt.compare(password, admin.password);
         if (!isPasswordValid) {
             return res.status(401).json({ success: false, error: 'Invalid credentials' });
         }
         
-        // Generate JWT token
         const token = jwt.sign(
             { adminId: admin._id, email: admin.email },
             process.env.JWT_SECRET,
@@ -148,7 +138,6 @@ app.post('/api/admin/change-password', authenticateAdmin, async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body;
         
-        // Validate input
         if (!currentPassword || !newPassword) {
             return res.status(400).json({ 
                 success: false, 
@@ -163,22 +152,18 @@ app.post('/api/admin/change-password', authenticateAdmin, async (req, res) => {
             });
         }
         
-        // Get admin from database with password
         const admin = await Admin.findById(req.admin._id);
         if (!admin) {
             return res.status(404).json({ success: false, error: 'Admin not found' });
         }
         
-        // Verify current password
         const isPasswordValid = await bcrypt.compare(currentPassword, admin.password);
         if (!isPasswordValid) {
             return res.status(401).json({ success: false, error: 'Current password is incorrect' });
         }
         
-        // Hash new password
         const hashedNewPassword = await bcrypt.hash(newPassword, 10);
         
-        // Update password
         admin.password = hashedNewPassword;
         admin.updatedAt = new Date();
         await admin.save();
@@ -204,7 +189,7 @@ app.get('/api/admin/verify', authenticateAdmin, async (req, res) => {
     });
 });
 
-// ========== PROMPT ROUTES ==========
+// ========== PROMPT SCHEMA & ROUTES ==========
 const promptSchema = new mongoose.Schema({
     title: { type: String, required: true },
     category: { type: String, required: true },
@@ -215,14 +200,13 @@ const promptSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
-// Broadcast Schema
 const broadcastSchema = new mongoose.Schema({
     message: { type: String, required: true },
     sentBy: { type: String, default: 'admin' },
     createdAt: { type: Date, default: Date.now }
 });
-const Broadcast = mongoose.model('Broadcast', broadcastSchema);
 
+const Broadcast = mongoose.model('Broadcast', broadcastSchema);
 const Prompt = mongoose.model('Prompt', promptSchema);
 
 app.get('/api/prompts', async (req, res) => {
@@ -244,15 +228,10 @@ app.post('/api/prompt/like', async (req, res) => {
     }
 });
 
-// ========== SUPER ADMIN API ROUTES ==========
-
-// ✅ FIXED: GET /api/admin/stats - Dashboard analytics (no more User model error)
+// ========== STATS ROUTE ==========
 app.get('/api/admin/stats', authenticateAdmin, async (req, res) => {
     try {
-        // Get total prompts count
         const totalPrompts = await Prompt.countDocuments();
-        
-        // Try to get user counts, but don't crash if User model doesn't have data
         let totalUsers = 0;
         let activeUsers = 0;
         
@@ -261,30 +240,20 @@ app.get('/api/admin/stats', authenticateAdmin, async (req, res) => {
             const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
             activeUsers = await User.countDocuments({ lastLogin: { $gte: twentyFourHoursAgo } });
         } catch (userError) {
-            console.log('ℹ️ User model exists but no data yet (this is normal for new setup)');
-            // Keep default values (0) - dashboard will show 0 users
+            console.log('ℹ️ No user data yet');
         }
         
         res.json({ 
             success: true, 
-            stats: { 
-                totalUsers: totalUsers, 
-                activeUsers: activeUsers, 
-                totalPrompts: totalPrompts 
-            }
+            stats: { totalUsers, activeUsers, totalPrompts }
         });
     } catch (error) {
         console.error('Stats error:', error);
-        // Even on error, return at least the prompt count
         try {
             const totalPrompts = await Prompt.countDocuments();
             res.json({ 
                 success: true, 
-                stats: { 
-                    totalUsers: 0, 
-                    activeUsers: 0, 
-                    totalPrompts: totalPrompts 
-                }
+                stats: { totalUsers: 0, activeUsers: 0, totalPrompts }
             });
         } catch (fallbackError) {
             res.status(500).json({ success: false, error: error.message });
@@ -292,7 +261,7 @@ app.get('/api/admin/stats', authenticateAdmin, async (req, res) => {
     }
 });
 
-// GET /api/admin/prompts - Fetch all prompts
+// ========== ADMIN PROMPT MANAGEMENT ==========
 app.get('/api/admin/prompts', authenticateAdmin, async (req, res) => {
     try {
         const prompts = await Prompt.find().sort({ createdAt: -1 }).lean();
@@ -303,7 +272,6 @@ app.get('/api/admin/prompts', authenticateAdmin, async (req, res) => {
     }
 });
 
-// POST /api/admin/prompts - Add new prompt
 app.post('/api/admin/prompts', authenticateAdmin, async (req, res) => {
     try {
         const { title, category, prompt, imageUrl } = req.body;
@@ -319,13 +287,11 @@ app.post('/api/admin/prompts', authenticateAdmin, async (req, res) => {
     }
 });
 
-// PUT /api/admin/prompts/:id - Update prompt
 app.put('/api/admin/prompts/:id', authenticateAdmin, async (req, res) => {
     try {
         const { title, category, prompt, imageUrl, likes } = req.body;
         const updateData = { title, category, prompt, imageUrl };
         
-        // Include likes if provided (for the like count update feature)
         if (likes !== undefined) {
             updateData.likes = likes;
         }
@@ -347,7 +313,6 @@ app.put('/api/admin/prompts/:id', authenticateAdmin, async (req, res) => {
     }
 });
 
-// DELETE /api/admin/prompts/:id - Delete prompt
 app.delete('/api/admin/prompts/:id', authenticateAdmin, async (req, res) => {
     try {
         const deleted = await Prompt.findByIdAndDelete(req.params.id);
@@ -361,11 +326,11 @@ app.delete('/api/admin/prompts/:id', authenticateAdmin, async (req, res) => {
     }
 });
 
-// ========== ✅ FIXED BROADCAST ROUTE (matches admin.html) ==========
+// ========== ✅ BROADCAST ROUTE WITH BIG IMAGE SUPPORT ==========
 // POST /api/admin/broadcast - Send push notification to all users via FCM topic 'all'
 app.post('/api/admin/broadcast', authenticateAdmin, async (req, res) => {
     try {
-        const { message } = req.body;
+        const { message, imageUrl } = req.body;
         
         if (!message) {
             return res.status(400).json({ success: false, error: 'Message required' });
@@ -375,10 +340,10 @@ app.post('/api/admin/broadcast', authenticateAdmin, async (req, res) => {
         await Broadcast.create({ message, sentBy: req.admin.email });
         console.log(`📡 Broadcast initiated: "${message}" by ${req.admin.email}`);
         
-        // ========== FIREBASE PUSH NOTIFICATION ==========
-        // Send notification to topic 'all' (Kodular app should subscribe to this topic)
+        // ========== FIREBASE PUSH NOTIFICATION WITH BIG IMAGE ==========
         const notificationTitle = 'New Update from Prompt Studio';
         
+        // Base FCM message structure
         const fcmMessage = {
             notification: {
                 title: notificationTitle,
@@ -389,26 +354,51 @@ app.post('/api/admin/broadcast', authenticateAdmin, async (req, res) => {
                 screen: 'home',
                 timestamp: Date.now().toString(),
             },
-            topic: 'all', // Sends to all devices subscribed to 'all' topic
+            topic: 'all',
         };
+        
+        // ✅ Add big image if provided
+        if (imageUrl && imageUrl.trim() !== '') {
+            // Standard notification image (supports big image on Android)
+            fcmMessage.notification.image = imageUrl;
+            
+            // Android specific big image configuration
+            fcmMessage.android = {
+                notification: {
+                    imageUrl: imageUrl,
+                    channelId: 'default',
+                    priority: 'high'
+                }
+            };
+            
+            // Data payload with image URL (for Kodular app to handle manually)
+            fcmMessage.data.image = imageUrl;
+            
+            console.log(`🖼️ Big Image attached: ${imageUrl}`);
+        }
         
         // Send the notification
         const fcmResponse = await admin.messaging().send(fcmMessage);
         
-        console.log(`✅ Firebase notification sent successfully! Message ID: ${fcmResponse}`);
+        console.log(`✅ Firebase notification sent! ID: ${fcmResponse}`);
         console.log(`📱 Title: "${notificationTitle}", Body: "${message}"`);
+        if (imageUrl) console.log(`🖼️ Big Image: ${imageUrl}`);
         
         res.json({ 
             success: true, 
             message: 'Alert sent successfully via push notification',
             fcmMessageId: fcmResponse,
-            broadcast: { title: notificationTitle, body: message, topic: 'all' }
+            broadcast: { 
+                title: notificationTitle, 
+                body: message, 
+                topic: 'all',
+                hasImage: !!imageUrl
+            }
         });
         
     } catch (error) {
         console.error('❌ Broadcast error:', error);
         
-        // Still return error so frontend knows it failed
         res.status(500).json({ 
             success: false, 
             error: 'Failed to send push notification',
@@ -426,8 +416,7 @@ async function startServer() {
         console.log(`🔐 Default Admin: ${process.env.ADMIN_EMAIL}`);
         console.log(`✅ Password change API: POST /api/admin/change-password`);
         console.log(`🔥 Firebase Push Notifications active: Topic "all"`);
-        console.log(`✅ CORS enabled for all origins`);
-        console.log(`✅ Stats API ready (Prompts: ${Prompt.countDocuments() || 0})`);
+        console.log(`🖼️ Big Image Support: Enabled`);
     });
 }
 
