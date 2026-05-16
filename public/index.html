@@ -613,6 +613,9 @@
         let renderedCount = 0;
         let loadMoreObserver = null;
         
+        // Backend API URL
+        const API_BASE_URL = 'https://promptstudio-2fou.onrender.com';
+        
         // Kodular ke Back Button ke liye Main Function
         function handleBackPress() {
             const sidebar = document.getElementById('sidebarMenu');
@@ -798,7 +801,7 @@
 
         function closeAllModals() { closeImageModal(); closeAdModal(); closeSidebar(); }
 
-        // ========== UPDATED: openImageModal WITH TRACKING ==========
+        // ========== UPDATED: openImageModal WITH TRACKING AND REAL-TIME UI UPDATE ==========
         function openImageModal(imageUrl, promptId) {
             if (promptId) trackView(promptId);
             const modal = document.getElementById('imageModal');
@@ -815,14 +818,37 @@
             document.body.style.overflow = '';
         }
 
-        // ========== trackView FUNCTION ==========
+        // ========== FIXED: trackView FUNCTION with Real-Time UI Update ==========
         async function trackView(promptId) {
             try {
-                await fetch('/api/prompt/view', {
+                const response = await fetch(`${API_BASE_URL}/api/prompt/view`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id: promptId })
                 });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update the view count in UI instantly
+                    const viewSpan = document.querySelector(`.view-count[data-id="${promptId}"]`);
+                    if (viewSpan) {
+                        viewSpan.textContent = formatNumber(data.views);
+                    }
+                    
+                    // Also update in the local prompts array for consistency
+                    const promptIndex = currentPrompts.findIndex(p => p._id === promptId);
+                    if (promptIndex !== -1) {
+                        currentPrompts[promptIndex].views = data.views;
+                    }
+                    
+                    const allPromptsIndex = allPromptsLoaded.findIndex(p => p._id === promptId);
+                    if (allPromptsIndex !== -1) {
+                        allPromptsLoaded[allPromptsIndex].views = data.views;
+                    }
+                    
+                    console.log(`✅ View tracked for ${promptId}, new count: ${data.views}`);
+                }
             } catch (error) {
                 console.error('Error tracking view:', error);
             }
@@ -896,7 +922,7 @@
             try {
                 const grid = document.getElementById('promptsGrid');
                 if (grid) grid.innerHTML = `<div class="skeleton h-64"></div><div class="skeleton h-64"></div><div class="skeleton h-64"></div><div class="skeleton h-64"></div><div class="skeleton h-64"></div><div class="skeleton h-64"></div>`;
-                const response = await fetch('/api/prompts');
+                const response = await fetch(`${API_BASE_URL}/api/prompts`);
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.error || 'Failed to fetch prompts');
                 let prompts = [];
@@ -1089,7 +1115,7 @@
                 if (wasLiked) { currentPrompts[promptIndex].likes--; currentPrompts[promptIndex].isLiked = false; } 
                 else { currentPrompts[promptIndex].likes++; currentPrompts[promptIndex].isLiked = true; }
                 updateLikeUI(id, currentPrompts[promptIndex].likes, currentPrompts[promptIndex].isLiked);
-                const response = await fetch('/api/prompt/like', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) });
+                const response = await fetch(`${API_BASE_URL}/api/prompt/like`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) });
                 if (!response.ok) throw new Error('Failed to update like');
             } catch (error) { console.error('Error updating like:', error); showToast('Error updating like.', true, 3000); }
         }
