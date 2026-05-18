@@ -134,6 +134,19 @@
             outline: none;
             border-color: #8b5cf6;
         }
+        
+        .views-input {
+            background: rgba(255,255,255,0.15);
+            border-radius: 8px;
+            padding: 4px 8px;
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+            width: 70px;
+        }
+        .views-input:focus {
+            outline: none;
+            border-color: #8b5cf6;
+        }
     </style>
 </head>
 <body class="flex items-center justify-center p-4 min-h-screen">
@@ -287,11 +300,12 @@
                                 <th>Category</th>
                                 <th>Prompt Preview</th>
                                 <th>Likes</th>
+                                <th>Views</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="promptsTableBody">
-                            <tr><td colspan="5" class="text-center text-white/50">Loading prompts...</td></tr>
+                            <tr><td colspan="6" class="text-center text-white/50">Loading prompts...</td><\/tr>
                         </tbody>
                     </table>
                 </div>
@@ -339,6 +353,11 @@
             </select>
             <textarea id="editPrompt" rows="5" placeholder="Prompt Text" class="input-field w-full px-4 py-3 rounded-xl text-white placeholder-white/50 mb-3"></textarea>
             <input type="text" id="editImageUrl" placeholder="Image URL" class="input-field w-full px-4 py-3 rounded-xl text-white placeholder-white/50 mb-3">
+            <!-- NEW: Views Input Field -->
+            <div class="mb-3">
+                <label class="text-white/70 text-sm mb-1 block">Views Count</label>
+                <input type="number" id="editViews" placeholder="Views" class="input-field w-full px-4 py-3 rounded-xl text-white placeholder-white/50" min="0">
+            </div>
             <div class="flex gap-3">
                 <button onclick="updateFullPrompt()" class="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 py-3 rounded-xl font-semibold text-white transition-all">
                     <i class="fas fa-save mr-2"></i> Update Prompt
@@ -360,11 +379,11 @@
 
     <script>
         let adminToken = null;
+        // Global array to store prompts data for safe editing
+        let promptsData = [];
         
         // ✅ DYNAMIC SERVER URL - Auto-detects current host
         function getBaseUrl() {
-            // If running on Render or any production server, use current origin
-            // For local development, you can change this to http://localhost:3000
             return window.location.origin;
         }
         
@@ -406,7 +425,7 @@
             };
         }
         
-        // ========== SEND PUSH NOTIFICATION (FIXED - matches server.js route) ==========
+        // ========== SEND PUSH NOTIFICATION ==========
         async function sendPushNotification() {
             const title = document.getElementById('notifyTitle').value.trim();
             const message = document.getElementById('notifyMessage').value.trim();
@@ -423,7 +442,6 @@
             sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Sending...';
             
             try {
-                // ✅ CORRECT ENDPOINT: /api/admin/broadcast (matches server.js)
                 const response = await fetch(`${getBaseUrl()}/api/admin/broadcast`, {
                     method: 'POST',
                     headers: getAuthHeaders(),
@@ -449,7 +467,7 @@
             }
         }
         
-        // ========== LOAD STATS (FIXED - with proper auth) ==========
+        // ========== LOAD STATS ==========
         async function loadStats() {
             try {
                 const response = await fetch(`${getBaseUrl()}/api/admin/stats`, { 
@@ -468,7 +486,7 @@
             }
         }
         
-        // ========== LOAD PROMPTS (FIXED - with proper auth) ==========
+        // ========== LOAD PROMPTS (FIXED - using data attributes, not inline quotes) ==========
         async function loadPrompts() {
             try {
                 const response = await fetch(`${getBaseUrl()}/api/admin/prompts`, { 
@@ -477,11 +495,16 @@
                 const data = await response.json();
                 
                 if (data.success && data.prompts) {
+                    // Store prompts data globally for safe editing
+                    promptsData = data.prompts;
+                    
                     const tbody = document.getElementById('promptsTableBody');
                     if (data.prompts.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-white/50">No prompts found</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-white/50">No prompts found</td><\/tr>';
                     } else {
-                        tbody.innerHTML = data.prompts.map(p => `
+                        tbody.innerHTML = data.prompts.map(p => {
+                            // Store the prompt ID as a data attribute and pass only ID to edit function
+                            return `
                             <tr>
                                 <td class="max-w-[150px] truncate">${escapeHtml(p.title)}</td>
                                 <td><span class="glass px-2 py-1 rounded-full text-xs">${escapeHtml(p.category)}</span></td>
@@ -495,7 +518,15 @@
                                     </div>
                                 </td>
                                 <td>
-                                    <button onclick='openEditModal("${p._id}", "${escapeHtml(p.title)}", "${escapeHtml(p.category)}", "${escapeHtml(p.prompt).replace(/'/g, "\\'")}", "${escapeHtml(p.imageUrl || '')}")' class="action-btn text-blue-400 mr-2" title="Edit Full Prompt">
+                                    <div class="flex items-center gap-2">
+                                        <input type="number" id="viewsInput_${p._id}" value="${p.views || 0}" class="views-input" min="0" step="1">
+                                        <button onclick="updateViewsCount('${p._id}')" class="action-btn text-blue-400 hover:text-blue-300" title="Update Views">
+                                            <i class="fas fa-save text-sm"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                                <td>
+                                    <button onclick="openEditModalById('${p._id}')" class="action-btn text-blue-400 mr-2" title="Edit Full Prompt">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <button onclick="deletePrompt('${p._id}')" class="action-btn text-red-400" title="Delete">
@@ -503,7 +534,7 @@
                                     </button>
                                 </td>
                             </tr>
-                        `).join('');
+                        `}).join('');
                     }
                 } else if (response.status === 401) {
                     adminLogout();
@@ -535,6 +566,9 @@
                 if (data.success) {
                     showToast('✅ Like count updated!');
                     loadStats();
+                    // Update local data
+                    const promptIndex = promptsData.findIndex(p => p._id === promptId);
+                    if (promptIndex !== -1) promptsData[promptIndex].likes = newLikes;
                 } else {
                     showToast(data.error || 'Failed', true);
                     loadPrompts();
@@ -546,13 +580,57 @@
             }
         }
         
-        // ========== OPEN EDIT MODAL ==========
-        function openEditModal(id, title, category, prompt, imageUrl) {
-            document.getElementById('editPromptId').value = id;
-            document.getElementById('editTitle').value = title;
-            document.getElementById('editCategory').value = category;
-            document.getElementById('editPrompt').value = prompt;
-            document.getElementById('editImageUrl').value = imageUrl || '';
+        // ========== UPDATE VIEWS COUNT (NEW FEATURE) ==========
+        async function updateViewsCount(promptId) {
+            const viewsInput = document.getElementById(`viewsInput_${promptId}`);
+            const newViews = parseInt(viewsInput.value);
+            
+            if (isNaN(newViews) || newViews < 0) {
+                showToast('Please enter a valid number', true);
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${getBaseUrl()}/api/admin/prompts/${promptId}`, {
+                    method: 'PUT',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ views: newViews })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showToast('✅ Views count updated!');
+                    loadStats();
+                    // Update local data
+                    const promptIndex = promptsData.findIndex(p => p._id === promptId);
+                    if (promptIndex !== -1) promptsData[promptIndex].views = newViews;
+                } else {
+                    showToast(data.error || 'Failed', true);
+                    loadPrompts();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast('Network error', true);
+                loadPrompts();
+            }
+        }
+        
+        // ========== OPEN EDIT MODAL BY ID (CRASH-PROOF - uses global promptsData) ==========
+        function openEditModalById(promptId) {
+            // Find the prompt data from the global array
+            const prompt = promptsData.find(p => p._id === promptId);
+            if (!prompt) {
+                showToast('Error: Prompt not found', true);
+                return;
+            }
+            
+            // Safely populate the modal fields
+            document.getElementById('editPromptId').value = prompt._id;
+            document.getElementById('editTitle').value = prompt.title || '';
+            document.getElementById('editCategory').value = prompt.category || 'Portrait';
+            document.getElementById('editPrompt').value = prompt.prompt || '';
+            document.getElementById('editImageUrl').value = prompt.imageUrl || '';
+            document.getElementById('editViews').value = prompt.views || 0;
             document.getElementById('editModal').classList.add('active');
         }
         
@@ -560,13 +638,14 @@
             document.getElementById('editModal').classList.remove('active');
         }
         
-        // ========== UPDATE FULL PROMPT ==========
+        // ========== UPDATE FULL PROMPT (including Views) ==========
         async function updateFullPrompt() {
             const id = document.getElementById('editPromptId').value;
             const title = document.getElementById('editTitle').value.trim();
             const category = document.getElementById('editCategory').value;
             const prompt = document.getElementById('editPrompt').value.trim();
             const imageUrl = document.getElementById('editImageUrl').value.trim();
+            const views = parseInt(document.getElementById('editViews').value) || 0;
             
             if (!title || !prompt) {
                 showToast('Title and Prompt are required!', true);
@@ -577,7 +656,7 @@
                 const response = await fetch(`${getBaseUrl()}/api/admin/prompts/${id}`, {
                     method: 'PUT',
                     headers: getAuthHeaders(),
-                    body: JSON.stringify({ title, category, prompt, imageUrl })
+                    body: JSON.stringify({ title, category, prompt, imageUrl, views })
                 });
                 
                 const data = await response.json();
