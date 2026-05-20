@@ -296,9 +296,39 @@
             width: 100%;
         }
         
+        /* Ad card styling to match glassmorphism */
+        .ad-card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            transition: transform 0.2s ease;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 300px;
+            padding: 15px;
+        }
+        
+        .ad-card:hover {
+            transform: translateY(-4px);
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(139, 92, 246, 0.5);
+            box-shadow: 0 12px 25px rgba(0, 0, 0, 0.2);
+        }
+        
+        .ad-label {
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 12px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
         @media (max-width: 768px) {
             .container { padding-left: 12px; padding-right: 12px; }
             .glass-card { border-radius: 16px; }
+            .ad-card { border-radius: 16px; min-height: 280px; }
             .image-modal-close { top: 15px; right: 15px; width: 40px; height: 40px; font-size: 30px; }
             .compact-title { font-size: 0.8rem; }
             .compact-prompt { font-size: 0.65rem; }
@@ -538,14 +568,14 @@
             <div class="ad-placeholder" id="bannerAdPlaceholder">
                 <script type="text/javascript">
                     atOptions = {
-                        'key' : 'e9d01f858e3adc8437cbab86756087f4',
+                        'key' : 'fa6c89ee0d308772a879bcde725a9c99',
                         'format' : 'iframe',
                         'height' : 50,
                         'width' : 320,
                         'params' : {}
                     };
                 </script>
-                <script type="text/javascript" src="//www.highperformanceformat.com/e9d01f858e3adc8437cbab86756087f4/invoke.js"></script>
+                <script type="text/javascript" src="//www.highperformanceformat.com/fa6c89ee0d308772a879bcde725a9c99/invoke.js"></script>
             </div>
         </div>
     </div>
@@ -613,8 +643,36 @@
         let renderedCount = 0;
         let loadMoreObserver = null;
         
+        // Ad injection frequency - show ad after every 18th prompt
+        const AD_FREQUENCY = 18;
+        let adCounter = 0;
+        
         // Backend API URL
         const API_BASE_URL = 'https://promptstudio-2fou.onrender.com';
+        
+        // Function to generate ad card HTML
+        function generateAdCard(adIndex) {
+            return `
+                <div class="ad-card">
+                    <div class="ad-label">Advertisement</div>
+                    <div id="ad-container-${adIndex}" style="width:100%; min-height:250px; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+                        <span style="color:rgba(255,255,255,0.4); font-size:14px; margin-bottom:10px;">Loading Ad...</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Function to load Monetag ad script dynamically for each ad slot
+        function loadAdScript(adIndex) {
+            const container = document.getElementById(`ad-container-${adIndex}`);
+            if (!container) return;
+            
+            // Clear container and add script
+            container.innerHTML = '';
+            const script = document.createElement('script');
+            script.innerHTML = `(function(s,u,z,p,v,e,r){s.id=r;s[p]=s[p]||function(){(s[p].q=s[p].q||[]).push(arguments)};e=u.createElement(z);r=u.getElementsByTagName(z)[0];e.async=1;e.src=v;r.parentNode.insertBefore(e,r)})(window,document,'script','zoneai','//thubanoa.com/123456/zone.js','ad_${adIndex}');`;
+            container.appendChild(script);
+        }
         
         // Kodular ke Back Button ke liye Main Function
         function handleBackPress() {
@@ -685,7 +743,7 @@
             if (!container) return;
             container.innerHTML = '';
             const script = document.createElement('script');
-            script.innerHTML = `(function(s){s.dataset.zone='10920892',s.src='https://n6wxm.com/vignette.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))`;
+            script.innerHTML = '(function(s){s.dataset.zone="11025236",s.src="https://nap5k.com/tag.min.js"})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement("script")))';
             container.appendChild(script);
             monetagScriptLoaded = true;
         }
@@ -718,9 +776,7 @@
         function stopAdTimer() { if (adTimerInterval) { clearInterval(adTimerInterval); adTimerInterval = null; } }
 
         // ========== IMPROVED COPY BUTTON LOGIC - Using event delegation and data attributes ==========
-        // This function safely handles any prompt text, even with special characters
         function handleCopyClick(buttonElement) {
-            // Get the prompt text from the data attribute (safely escaped)
             const promptText = buttonElement.getAttribute('data-prompt-text');
             if (!promptText) {
                 showToast('❌ Error: No prompt text found', true, 2000);
@@ -809,24 +865,64 @@
 
         function closeAllModals() { closeImageModal(); closeAdModal(); closeSidebar(); }
 
-        // ========== UPDATED: openImageModal WITH TRACKING AND REAL-TIME UI UPDATE ==========
+        // ========== FIXED: openImageModal WITH HIGH QUALITY FULLSCREEN IMAGE ==========
         function openImageModal(imageUrl, promptId) {
             if (promptId) trackView(promptId);
             const modal = document.getElementById('imageModal');
             const modalImg = document.getElementById('modalImage');
+            
+            // Store original high-quality image URL
+            // If the image URL contains a thumbnail parameter, we remove it to get the original
+            let highQualityUrl = imageUrl;
+            
+            // Remove common thumbnail suffixes from URLs
+            if (imageUrl) {
+                // Remove /thumb, /thumbnail, /small, /medium from URLs
+                highQualityUrl = imageUrl
+                    .replace(/\/thumb\//g, '/')
+                    .replace(/\/thumbnail\//g, '/')
+                    .replace(/\/small\//g, '/')
+                    .replace(/\/medium\//g, '/')
+                    .replace(/-thumb\./g, '.')
+                    .replace(/-thumbnail\./g, '.')
+                    .replace(/-small\./g, '.')
+                    .replace(/-medium\./g, '.');
+                
+                // If it's a Picsum placeholder, use a higher quality version
+                if (highQualityUrl.includes('picsum.photos')) {
+                    highQualityUrl = highQualityUrl.replace('/400/600', '/1200/1800');
+                }
+            }
+            
+            // Set loading state
+            modalImg.style.opacity = '0';
             modal.classList.add('active');
-            modalImg.src = imageUrl;
+            
+            // Create a new image object to preload the high-quality image
+            const img = new Image();
+            img.onload = function() {
+                modalImg.src = highQualityUrl;
+                modalImg.style.opacity = '1';
+            };
+            img.onerror = function() {
+                // Fallback to original URL if high-quality fails
+                modalImg.src = imageUrl;
+                modalImg.style.opacity = '1';
+            };
+            img.src = highQualityUrl;
+            
             document.body.style.overflow = 'hidden';
             history.pushState({ modal: 'image' }, null, null);
         }
 
         function closeImageModal() {
             const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
             modal.classList.remove('active');
+            modalImg.style.opacity = '';
             document.body.style.overflow = '';
         }
 
-        // ========== FIXED: trackView FUNCTION with Real-Time UI Update ==========
         async function trackView(promptId) {
             try {
                 const response = await fetch(`${API_BASE_URL}/api/prompt/view`, {
@@ -838,13 +934,11 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    // Update the view count in UI instantly
                     const viewSpan = document.querySelector(`.view-count[data-id="${promptId}"]`);
                     if (viewSpan) {
                         viewSpan.textContent = formatNumber(data.views);
                     }
                     
-                    // Also update in the local prompts array for consistency
                     const promptIndex = currentPrompts.findIndex(p => p._id === promptId);
                     if (promptIndex !== -1) {
                         currentPrompts[promptIndex].views = data.views;
@@ -889,7 +983,6 @@
             hideExitModal();
         }
 
-        // ========== SWIPE TO REFRESH ==========
         let touchStartY = 0;
         let isRefreshing = false;
         const REFRESH_THRESHOLD = 100;
@@ -910,7 +1003,6 @@
             setTimeout(() => { isRefreshing = false; showSuccessToast('✓ Page refreshed!', 1500); }, 2000);
         }
 
-        // ========== MENU HANDLER ==========
         function handleMenuClick(action) {
             closeSidebar();
             switch(action) {
@@ -925,7 +1017,6 @@
             }
         }
 
-        // ========== FETCH PROMPTS WITH INCREMENTAL RENDERING ==========
         async function fetchPrompts() {
             try {
                 const grid = document.getElementById('promptsGrid');
@@ -939,10 +1030,10 @@
                 allPromptsLoaded = prompts.map(prompt => ({ ...prompt, isLiked: false }));
                 currentPrompts = [...allPromptsLoaded];
                 await renderCategories();
-                // FIX 9: Reset rendered count and load first chunk only
                 renderedCount = 0;
                 currentPage = 0;
-                filterPromptsAndRender(true); // Load first chunk
+                adCounter = 0;
+                filterPromptsAndRender(true);
                 const countElem = document.getElementById('promptCount');
                 if (countElem) countElem.textContent = `${currentPrompts.length}`;
             } catch (error) { 
@@ -951,7 +1042,6 @@
             }
         }
 
-        // FIX 10: INCREMENTAL RENDERING - Load more items on scroll
         function setupInfiniteScroll() {
             if (loadMoreObserver) loadMoreObserver.disconnect();
             loadMoreObserver = new IntersectionObserver((entries) => {
@@ -978,13 +1068,15 @@
         function appendPrompts(prompts) {
             const grid = document.getElementById('promptsGrid');
             if (!grid) return;
-            const newCards = prompts.map((prompt, idx) => {
-                // Safely escape the prompt text for data attribute using JSON.stringify
+            
+            let itemsHtml = '';
+            let adSlotIndex = 0;
+            
+            prompts.forEach((prompt, idx) => {
                 const safePromptText = JSON.stringify(prompt.prompt || '');
-                // Remove the outer quotes from JSON.stringify result for the data attribute
                 const cleanPromptText = safePromptText.slice(1, -1);
                 
-                return `
+                itemsHtml += `
                 <div class="glass-card transition-all duration-200">
                     <div class="image-container" onclick="openImageModal('${prompt.imageUrl || 'https://picsum.photos/400/600'}', '${prompt._id}')">
                         <img src="${prompt.imageUrl || 'https://picsum.photos/400/600'}" 
@@ -1016,19 +1108,31 @@
                         </div>
                     </div>
                 </div>
-            `}).join('');
+                `;
+                
+                // Increment global counter and check if we need to insert an ad
+                const globalIndex = renderedCount + idx;
+                if ((globalIndex + 1) % AD_FREQUENCY === 0 && (globalIndex + 1) < currentPrompts.length) {
+                    itemsHtml += generateAdCard(adSlotIndex);
+                    adSlotIndex++;
+                }
+            });
             
-            // Remove sentinel if exists, then add new cards, then re-add sentinel
             const sentinel = document.getElementById('loadMoreSentinel');
             if (sentinel) sentinel.remove();
-            grid.insertAdjacentHTML('beforeend', newCards);
+            grid.insertAdjacentHTML('beforeend', itemsHtml);
+            
+            // Load ad scripts for newly added ad containers
+            for (let i = 0; i < adSlotIndex; i++) {
+                loadAdScript(i);
+            }
+            
             if (renderedCount + prompts.length < currentPrompts.length) {
                 grid.insertAdjacentHTML('beforeend', '<div id="loadMoreSentinel" class="col-span-full h-4"></div>');
                 setupInfiniteScroll();
             }
         }
 
-        // ========== RENDER PROMPTS WITH INCREMENTAL LOADING ==========
         function renderPrompts(prompts, isInitial = false) {
             const grid = document.getElementById('promptsGrid');
             if (!grid) return;
@@ -1037,17 +1141,18 @@
                 return; 
             }
             
-            // Only render first chunk
             const firstChunk = prompts.slice(0, ITEMS_PER_PAGE);
             renderedCount = firstChunk.length;
+            adCounter = 0;
             
-            grid.innerHTML = firstChunk.map((prompt, index) => {
-                // Safely escape the prompt text for data attribute using JSON.stringify
+            let itemsHtml = '';
+            let adSlotIndex = 0;
+            
+            firstChunk.forEach((prompt, idx) => {
                 const safePromptText = JSON.stringify(prompt.prompt || '');
-                // Remove the outer quotes from JSON.stringify result for the data attribute
                 const cleanPromptText = safePromptText.slice(1, -1);
                 
-                return `
+                itemsHtml += `
                 <div class="glass-card transition-all duration-200">
                     <div class="image-container" onclick="openImageModal('${prompt.imageUrl || 'https://picsum.photos/400/600'}', '${prompt._id}')">
                         <img src="${prompt.imageUrl || 'https://picsum.photos/400/600'}" 
@@ -1079,16 +1184,28 @@
                         </div>
                     </div>
                 </div>
-            `}).join('');
+                `;
+                
+                // Check if we need to insert an ad after this prompt
+                if ((idx + 1) % AD_FREQUENCY === 0 && (idx + 1) < firstChunk.length) {
+                    itemsHtml += generateAdCard(adSlotIndex);
+                    adSlotIndex++;
+                }
+            });
             
-            // Add sentinel for infinite scroll if more items exist
+            grid.innerHTML = itemsHtml;
+            
+            // Load ad scripts
+            for (let i = 0; i < adSlotIndex; i++) {
+                loadAdScript(i);
+            }
+            
             if (prompts.length > ITEMS_PER_PAGE) {
                 grid.insertAdjacentHTML('beforeend', '<div id="loadMoreSentinel" class="col-span-full h-4"></div>');
                 setupInfiniteScroll();
             }
         }
 
-        // ========== FILTER FUNCTIONS with debounce ==========
         let debounceTimer = null;
         
         function filterPromptsAndRender(isInitial = false) {
@@ -1156,7 +1273,6 @@
         function formatNumber(num) { if (!num) return '0'; if (num >= 1000) return (num / 1000).toFixed(1) + 'k'; return num.toString(); }
         function showError(message) { const grid = document.getElementById('promptsGrid'); if (grid) { grid.innerHTML = `<div class="col-span-2 text-center py-12"><i class="fas fa-exclamation-triangle text-yellow-400 text-6xl mb-4"></i><p class="text-white/80 text-lg">${message}</p><button onclick="fetchPrompts()" class="mt-4 glass px-6 py-2 rounded-full text-white hover:bg-white/20 transition-all">Try Again</button></div>`; } }
 
-        // FIX 11: DEBOUNCED SEARCH INPUT (replaced direct filter)
         document.getElementById('searchInput').addEventListener('input', (e) => {
             if (debounceTimer) clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
@@ -1170,33 +1286,22 @@
         document.getElementById('cancelExitBtn').addEventListener('click', hideExitModal);
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSidebar(); if (!document.getElementById('adModal').classList.contains('hidden')) closeAdModal(); if (!document.getElementById('exitModal').classList.contains('hidden')) hideExitModal(); } });
 
-        // ========== INITIALIZE ==========
         document.addEventListener('DOMContentLoaded', () => { fetchPrompts(); });
 
-        // ========== 🔴 BACK BUTTON HANDLING LOGIC - ADDED AT THE END ==========
-        // This code handles:
-        // 1. When sidebar is open → closes sidebar
-        // 2. When image modal is open → closes modal
-        // 3. Otherwise shows Exit popup with Cancel/Exit buttons
-        
-        // Get references to all modal elements
         const sidebarMenu = document.getElementById('sidebarMenu');
         const imageModalElem = document.getElementById('imageModal');
         const exitModalElem = document.getElementById('exitModal');
         const confirmExitBtn = document.getElementById('confirmExitBtn');
         const cancelExitBtn = document.getElementById('cancelExitBtn');
         
-        // Function to check if sidebar is open
         function isSidebarOpen() {
             return sidebarMenu && !sidebarMenu.classList.contains('-translate-x-full');
         }
         
-        // Function to check if image modal is open
         function isImageModalOpen() {
             return imageModalElem && imageModalElem.classList.contains('active');
         }
         
-        // Close sidebar function
         function closeSidebarMenu() {
             if (sidebarMenu) {
                 sidebarMenu.classList.remove('translate-x-0');
@@ -1207,7 +1312,6 @@
             }
         }
         
-        // Close image modal function
         function closeImageModalWindow() {
             if (imageModalElem) {
                 imageModalElem.classList.remove('active');
@@ -1215,54 +1319,41 @@
             }
         }
         
-        // Show exit confirmation popup
         function showExitConfirmation() {
             if (exitModalElem) {
                 exitModalElem.classList.remove('hidden');
             }
         }
         
-        // Hide exit confirmation popup
         function hideExitConfirmation() {
             if (exitModalElem) {
                 exitModalElem.classList.add('hidden');
             }
         }
         
-        // Exit app function
         function exitApplication() {
             hideExitConfirmation();
-            // Try to close the app (works in WebView/App Inventor)
             if (window.AppInventor && window.AppInventor.setWebViewString) {
                 window.AppInventor.setWebViewString('exit');
             } else {
-                // Browser fallback
                 window.close();
-                // If window.close doesn't work, try history back
                 window.history.back();
             }
         }
         
-        // Main back button handler (Android hardware back button)
         function handleAndroidBackButton() {
-            // Priority 1: Check if sidebar is open
             if (isSidebarOpen()) {
                 closeSidebarMenu();
-                return true; // Handled
+                return true;
             }
-            
-            // Priority 2: Check if image modal is open
             if (isImageModalOpen()) {
                 closeImageModalWindow();
-                return true; // Handled
+                return true;
             }
-            
-            // Priority 3: No modal open, show exit popup
             showExitConfirmation();
-            return true; // Handled
+            return true;
         }
         
-        // Attach exit modal button event listeners
         if (confirmExitBtn) {
             confirmExitBtn.onclick = function() {
                 exitApplication();
@@ -1275,45 +1366,33 @@
             };
         }
         
-        // Override the existing onpopstate to work with our new logic
-        // Store original popstate handler
         const originalPopState = window.onpopstate;
         
-        // Set new popstate handler
         window.onpopstate = function(event) {
-            // Check if any modal is open
             if (isSidebarOpen()) {
                 closeSidebarMenu();
-                // Push new state to prevent exit
                 history.pushState({ page: 'home' }, null, null);
                 showSuccessToast('Sidebar closed', 1000);
                 return;
             }
-            
             if (isImageModalOpen()) {
                 closeImageModalWindow();
                 history.pushState({ page: 'home' }, null, null);
                 showSuccessToast('Image viewer closed', 1000);
                 return;
             }
-            
             if (event.state && event.state.modal === 'image') {
                 closeImageModalWindow();
                 return;
             }
-            
             if (event.state && event.state.modal === 'sidebar') {
                 closeSidebarMenu();
                 return;
             }
-            
-            // No modal open, show exit popup
             showExitConfirmation();
-            // Push a new state to keep the app alive
             history.pushState({ page: 'home' }, null, null);
         };
         
-        // Override the existing openImageModal to also push state
         const originalOpenImageModal = window.openImageModal;
         window.openImageModal = function(imageUrl, promptId) {
             if (originalOpenImageModal) {
@@ -1322,7 +1401,6 @@
             history.pushState({ modal: 'image' }, null, null);
         };
         
-        // Override the existing openSidebar to also push state
         const originalOpenSidebar = window.openSidebar;
         window.openSidebar = function() {
             if (originalOpenSidebar) {
@@ -1331,33 +1409,26 @@
             history.pushState({ modal: 'sidebar' }, null, null);
         };
         
-        // Add a dedicated hardware back button listener for Android WebView
-        // This works with the standard 'backbutton' event in WebView
         document.addEventListener('backbutton', function(e) {
             e.preventDefault();
             handleAndroidBackButton();
         });
         
-        // Also handle regular popstate for browser environments
-        // Push initial state to prevent immediate exit on first back press
         if (!history.state) {
             history.pushState({ page: 'home' }, null, null);
         }
         
         console.log('✅ Back button handler initialized');
-        console.log('   - Sidebar open → closes sidebar');
-        console.log('   - Image modal open → closes modal');
-        console.log('   - Otherwise → shows exit popup with Cancel/Exit');
         
         function handleBackPress() {
-    if (!sidebarMenu.classList.contains('-translate-x-full')) {
-        closeSidebar();
-    } else if (imageModal.classList.contains('active')) {
-        closeImageModal();
-    } else {
-        document.getElementById('exitModal').classList.remove('hidden');
-    }
-}
+            if (!sidebarMenu.classList.contains('-translate-x-full')) {
+                closeSidebar();
+            } else if (imageModal.classList.contains('active')) {
+                closeImageModal();
+            } else {
+                document.getElementById('exitModal').classList.remove('hidden');
+            }
+        }
     </script>
 </body>
 </html>
